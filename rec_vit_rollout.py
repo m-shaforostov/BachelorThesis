@@ -42,7 +42,7 @@ def rollout_matrix_to_mask(result):
     mask = mask / np.max(mask)
     return mask
 
-def build_step_transition(prev_step_rollout_matrix, patch_link="identity"):
+def build_step_transition(prev_step_rollout_matrix, patch_attendance="identity"):
     """
     Build the transition matrix C_t from input tokens of step t
     to input tokens of step t-1.
@@ -55,16 +55,16 @@ def build_step_transition(prev_step_rollout_matrix, patch_link="identity"):
     - patch_link == "zero":
         use when patches at each step are treated as new roots
     """
-    if patch_link == "identity":
+    if patch_attendance == "identity":
         # Same-patch assumption: patch i at step t corresponds to patch i at step t-1
         n_tokens = prev_step_rollout_matrix.size(-1)
         transition = torch.eye(n_tokens)
-    elif patch_link == "zero":
+    elif patch_attendance == "zero":
         # Different-patch-root assumption: no direct patch-to-patch connection across steps
         transition = torch.zeros_like(prev_step_rollout_matrix)
     else:
         raise ValueError(
-            f"patch_link='{patch_link}' not supported. "
+            f"patch_link='{patch_attendance}' not supported. "
             f"Use 'identity' or 'zero'."
         )
     # Current input CLS at step t = previous step output CLS
@@ -141,7 +141,7 @@ class RecVITAttentionRollout:
                 # C_t: input(step t) -> input(step t-1)
                 curr_step_input_to_prev_input = build_step_transition(
                     self.step_rollout_matrices[step - 1],
-                    patch_link=self.patch_link
+                    patch_attendance=self.patch_link
                 )
                 # B_t: input(step t) -> input(step 1)
                 # B_t = C_t * B_(t-1)
