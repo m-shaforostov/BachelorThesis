@@ -50,9 +50,9 @@ def build_step_transition(prev_step_rollout_matrix, patch_attendance="identity")
     - current input CLS at step t is previous step output CLS
       => row 0 must be previous step CLS rollout row
 
-    - patch_link == "identity":
+    - patch_attendance == "identity":
         use when the same image patches are reused across recurrent steps
-    - patch_link == "zero":
+    - patch_attendance == "zero":
         use when patches at each step are treated as new roots
     """
     if patch_attendance == "identity":
@@ -64,7 +64,7 @@ def build_step_transition(prev_step_rollout_matrix, patch_attendance="identity")
         transition = torch.zeros_like(prev_step_rollout_matrix)
     else:
         raise ValueError(
-            f"patch_link='{patch_attendance}' not supported. "
+            f"patch_attendance='{patch_attendance}' not supported. "
             f"Use 'identity' or 'zero'."
         )
     # Current input CLS at step t = previous step output CLS
@@ -85,18 +85,18 @@ class RecVITAttentionRollout:
 
     Assumption:
     - final output of interest is the LAST recurrent step
-    - patch_link decides how to connect patch inputs across steps:
+    - patch_attendance decides how to connect patch inputs across steps:
         * identity -> same patch tokens reused
         * zero     -> different patch roots per step
     """
-    def __init__(self, model, head_fusion="mean", discard_ratio=0.9, repeats=1, patch_link="identity"):
+    def __init__(self, model, head_fusion="mean", discard_ratio=0.9, repeats=1, patch_attendance="identity"):
         self.model = model
         self.head_fusion = head_fusion
         self.discard_ratio = discard_ratio
         self.attentions = []
 
         self.repeats = repeats
-        self.patch_link = patch_link
+        self.patch_attendance = patch_attendance
 
         # Standard rollout per recurrent step
         self.step_rollout_matrices = []
@@ -141,7 +141,7 @@ class RecVITAttentionRollout:
                 # C_t: input(step t) -> input(step t-1)
                 curr_step_input_to_prev_input = build_step_transition(
                     self.step_rollout_matrices[step - 1],
-                    patch_attendance=self.patch_link
+                    patch_attendance=self.patch_attendance
                 )
                 # B_t: input(step t) -> input(step 1)
                 # B_t = C_t * B_(t-1)
