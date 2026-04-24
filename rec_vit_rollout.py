@@ -68,7 +68,7 @@ def build_step_transition(prev_step_rollout_matrix, patch_attendance="identity")
             f"Use 'identity' or 'zero'."
         )
     # Current input CLS at step t = previous step output CLS
-    transition[0, 0, :] = prev_step_rollout_matrix[0, 0, :]
+    transition[0, :] = prev_step_rollout_matrix[0, 0, :]
 
     return transition
 
@@ -89,7 +89,7 @@ class RecVITAttentionRollout:
         * identity -> same patch tokens reused
         * zero     -> different patch roots per step
     """
-    def __init__(self, model, head_fusion="mean", discard_ratio=0.9, repeats=1, patch_attendance="identity"):
+    def __init__(self, model, head_fusion="mean", discard_ratio=0.9, repeats=1, patch_attendance="identity", use_different_inputs=False):
         self.model = model
         self.head_fusion = head_fusion
         self.discard_ratio = discard_ratio
@@ -97,6 +97,7 @@ class RecVITAttentionRollout:
 
         self.repeats = repeats
         self.patch_attendance = patch_attendance
+        self.use_different_inputs = use_different_inputs
 
         # Standard rollout per recurrent step
         self.step_rollout_matrices = []
@@ -129,7 +130,7 @@ class RecVITAttentionRollout:
         # save attentions grouped by steps
         self.current_step_attentions.append(attn.detach().cpu())
 
-    def rec_rollout(self, input_tensor, cls_token):
+    def rec_rollout(self):
         # Derive overall rollout across the recurrent network
         # B_t maps input tokens of step t to input tokens of step 1
         # Start with B_1 = I
@@ -182,11 +183,17 @@ class RecVITAttentionRollout:
             cls_token = self.model.cls_token.expand(input_tensor.shape[0], -1, -1)
             print("2. cls_token.shape = ", cls_token.shape)
 
+            if self.use_different_inputs and input_tensor.size() != self.repeats:
+                    print("Number of input tensors ({}) does not match number of recurrence steps ({})".format(input_tensor.size(), self.repeats))
+
             # Run recurrent steps one by one
             for step in range(self.repeats):
                 self.current_step_attentions = []
+
                 # model(x, cls_tok) -> (logits, new_cls_tok)
-                _, cls_token = self.model(input_tensor, cls_token)
+                step_input = input_tensor[step] if self.use_different_inputs else input_tensor
+                _, cls_token = self.model(step_input, cls_token)
+
                 # Store attentions for this recurrent step
                 self.attentions.append(self.current_step_attentions)
 
@@ -199,4 +206,4 @@ class RecVITAttentionRollout:
                 self.step_rollout_matrices.append(step_rollout_matrix)
                 self.step_rollout_masks.append(rollout_matrix_to_mask(step_rollout_matrix))
 
-        return self.rec_rollout(input_tensor, cls_token)
+        return self.rec_rollout(), self.step_rollout_masks

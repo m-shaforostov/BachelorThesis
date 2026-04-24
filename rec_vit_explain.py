@@ -44,6 +44,8 @@ def get_args():
     parser.add_argument('--patch_attendance', type=str, default='identity',
                         help="How to connect patch tokens across recurrent steps: 'identity' if same inputs are used or"
                              "'zero' if different inputs are used across recurrent steps")
+    parser.add_argument('--use_different_inputs', type=str, default=False,
+                       help="Do you provide different inputs across recurrent steps?")
 
     args = parser.parse_args()
     args.use_cuda = args.use_cuda and torch.cuda.is_available()
@@ -76,7 +78,9 @@ if __name__ == '__main__':
         device,
         args.method2,
         args.reg_1000,
-        args.on_off)
+        args.on_off,
+        args.patch_attendance,
+        args.use_different_inputs)
     # Load the trained raw RecViT checkpoint
     model = load_trained_network(
         name=args.model_name,
@@ -107,27 +111,47 @@ if __name__ == '__main__':
         input_tensor = input_tensor.cuda()
 
     print("Doing RecViT Attention Rollout")
-    attention_rollout = RecVITAttentionRollout(
+    attention_rollout  = RecVITAttentionRollout(
         model,
         head_fusion=args.head_fusion,
         discard_ratio=args.discard_ratio,
         repeats=args.n_loops,
         patch_attendance=args.patch_attendance,
+        use_different_inputs=args.use_different_inputs,
     )
-    mask = attention_rollout(input_tensor)
-
-    name = "rec_attention_rollout_loops{}_{}_ {:.3f}_{}.png".format(
+    rec_rollout_output_mask, rollout_matrices = attention_rollout(input_tensor)
+    directory = "./rec_rollout_run_results/"
+    name = "rec_attention_rollout_loops_{}_{}_{:.3f}_{}.png".format(
         args.n_loops,
         args.patch_attendance,
         args.discard_ratio,
         args.head_fusion
     ).replace(" ", "")
 
+    path = directory + name
     np_img = np.array(img)[:, :, ::-1]
-    mask = cv2.resize(mask, (np_img.shape[1], np_img.shape[0]))
+    mask = cv2.resize(rec_rollout_output_mask, (np_img.shape[1], np_img.shape[0]))
     mask = show_mask_on_image(np_img, mask)
     cv2.imshow("Input Image", np_img)
-    cv2.imshow(name, mask)
+    cv2.imshow(path, mask)
     cv2.imwrite("input.png", np_img)
-    cv2.imwrite(name, mask)
+    cv2.imwrite(path, mask)
     cv2.waitKey(-1)
+
+    for step, matrix in enumerate(rollout_matrices):
+        name = "attention_rollout_step_{}_{}_{:.3f}_{}.png".format(
+            step,
+            args.patch_attendance,
+            args.discard_ratio,
+            args.head_fusion
+        ).replace(" ", "")
+
+        path = directory + name
+        np_img = np.array(img)[:, :, ::-1]
+        mask = cv2.resize(matrix, (np_img.shape[1], np_img.shape[0]))
+        mask = show_mask_on_image(np_img, mask)
+        cv2.imshow("Input Image", np_img)
+        cv2.imshow(path, mask)
+        cv2.imwrite("input.png", np_img)
+        cv2.imwrite(path, mask)
+        cv2.waitKey(-1)
