@@ -193,7 +193,6 @@ class RecVITAttentionRollout:
                 # model(x, cls_tok) -> (logits, new_cls_tok)
                 step_input = input_tensor[step] if self.use_different_inputs else input_tensor
                 _, cls_token = self.model(step_input, cls_token)
-
                 # Store attentions for this recurrent step
                 self.attentions.append(self.current_step_attentions)
 

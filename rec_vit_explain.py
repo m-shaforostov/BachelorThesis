@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 
 import argparse
@@ -15,6 +17,8 @@ def get_args():
     parser.add_argument('--use_cuda', action='store_true', default=False,
                         help='Use NVIDIA GPU acceleration')
     parser.add_argument('--image_path', type=str, default='./examples/both.png',
+                        help='Input image path')
+    parser.add_argument('--output_dir', type=str, default='./rollout_results/',
                         help='Input image path')
     parser.add_argument('--head_fusion', type=str, default='max',
                         help='How to fuse the attention heads for attention rollout. '
@@ -44,7 +48,7 @@ def get_args():
     parser.add_argument('--patch_attendance', type=str, default='identity',
                         help="How to connect patch tokens across recurrent steps: 'identity' if same inputs are used or"
                              "'zero' if different inputs are used across recurrent steps")
-    parser.add_argument('--use_different_inputs', type=str, default=False,
+    parser.add_argument('--use_different_inputs', action='store_true', default=False,
                        help="Do you provide different inputs across recurrent steps?")
 
     args = parser.parse_args()
@@ -70,7 +74,19 @@ if __name__ == '__main__':
     args = get_args()
     device = 'cuda:0' if args.use_cuda else 'cpu'
 
-    print("PARAMS:", args.model_name,
+    print("PARAMS:\n"
+          "name={}\n"
+          "dataset={}\n"
+          "n_loops={}\n"
+          "run_no={}\n"
+          "pretrained={}\n"
+          "device={}\n"
+          "method2={}\n"
+          "reg_1000={}\n"
+          "on_off={}\n"
+          "patch_attendance={}\n"
+          "use_different_inputs={}\n".format(
+        args.model_name,
         args.dataset,
         args.n_loops,
         args.run_no,
@@ -80,7 +96,8 @@ if __name__ == '__main__':
         args.reg_1000,
         args.on_off,
         args.patch_attendance,
-        args.use_different_inputs)
+        args.use_different_inputs))
+
     # Load the trained raw RecViT checkpoint
     model = load_trained_network(
         name=args.model_name,
@@ -102,8 +119,8 @@ if __name__ == '__main__':
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
     ])
 
-    # img = Image.open(args.image_path).convert('RGB')
-    img = Image.open(args.image_path)
+    img = Image.open(args.image_path).convert('RGB')
+    # img = Image.open(args.image_path)
     img = img.resize((224, 224))
     input_tensor = transform(img).unsqueeze(0)
 
@@ -119,39 +136,43 @@ if __name__ == '__main__':
         patch_attendance=args.patch_attendance,
         use_different_inputs=args.use_different_inputs,
     )
-    rec_rollout_output_mask, rollout_matrices = attention_rollout(input_tensor)
-    directory = "./rec_rollout_run_results/"
-    name = "rec_attention_rollout_loops_{}_{}_{:.3f}_{}.png".format(
+
+    final_rollout_mask, step_rollout_matrices = attention_rollout(input_tensor)
+
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    name = "rec_rollout_{}_loops_{}_{:.3f}_{}.png".format(
         args.n_loops,
         args.patch_attendance,
         args.discard_ratio,
         args.head_fusion
     ).replace(" ", "")
 
-    path = directory + name
+    path = args.output_dir + name
     np_img = np.array(img)[:, :, ::-1]
-    mask = cv2.resize(rec_rollout_output_mask, (np_img.shape[1], np_img.shape[0]))
+    mask = cv2.resize(final_rollout_mask, (np_img.shape[1], np_img.shape[0]))
     mask = show_mask_on_image(np_img, mask)
-    cv2.imshow("Input Image", np_img)
-    cv2.imshow(path, mask)
-    cv2.imwrite("input.png", np_img)
+    # cv2.imshow("Input Image", np_img)
+    # cv2.imshow(path, mask)
+    cv2.imwrite(args.image_path, np_img)
     cv2.imwrite(path, mask)
     cv2.waitKey(-1)
 
-    for step, matrix in enumerate(rollout_matrices):
-        name = "attention_rollout_step_{}_{}_{:.3f}_{}.png".format(
+    for step, matrix in enumerate(step_rollout_matrices):
+        name = "rec_rollout_{}_loops_step_{}_{}_{:.3f}_{}.png".format(
+            args.n_loops,
             step,
             args.patch_attendance,
             args.discard_ratio,
             args.head_fusion
         ).replace(" ", "")
 
-        path = directory + name
+        path = args.output_dir + name
         np_img = np.array(img)[:, :, ::-1]
         mask = cv2.resize(matrix, (np_img.shape[1], np_img.shape[0]))
         mask = show_mask_on_image(np_img, mask)
-        cv2.imshow("Input Image", np_img)
-        cv2.imshow(path, mask)
-        cv2.imwrite("input.png", np_img)
+        # cv2.imshow("Input Image", np_img)
+        # cv2.imshow(path, mask)
+        cv2.imwrite(args.image_path, np_img)
         cv2.imwrite(path, mask)
         cv2.waitKey(-1)
