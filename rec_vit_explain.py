@@ -12,6 +12,8 @@ from rec_vit_rollout import RecVITAttentionRollout
 from rec_vit_model.pckgs.networks.network_utils import load_trained_network
 
 
+CIFAR10_CLASSES = ["airplane", "automobile", "bird", "cat", "deer", "dog", "frog", "horse", "ship", "truck"]
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--use_cuda', action='store_true', default=False,
@@ -69,6 +71,11 @@ def show_mask_on_image(img, mask):
     cam = cam / np.max(cam)
     return np.uint8(255 * cam)
 
+def get_predictions(logits):
+    predictions = []
+    for i in logits:
+        predictions.append(CIFAR10_CLASSES[i.argmax(dim=1)])
+    return predictions
 
 if __name__ == '__main__':
     args = get_args()
@@ -137,7 +144,9 @@ if __name__ == '__main__':
         use_different_inputs=args.use_different_inputs,
     )
 
-    final_rollout_mask, step_rollout_matrices = attention_rollout(input_tensor)
+    final_rollout_mask, step_rollout_matrices, per_step_logits = attention_rollout(input_tensor)
+
+    print(get_predictions(per_step_logits))
 
     os.makedirs(args.output_dir, exist_ok=True)
 

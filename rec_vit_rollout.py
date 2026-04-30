@@ -109,6 +109,7 @@ class RecVITAttentionRollout:
 
         # Temporary step buffer used by hooks
         self.current_step_attentions = []
+        self.current_step_logits = []
 
         for name, module in model.named_modules():
             if "attn" in name and hasattr(module, "qkv"):
@@ -176,12 +177,14 @@ class RecVITAttentionRollout:
         self.step_rollout_masks = []
         # self.overall_rollout_matrices = []
         self.overall_rollout_masks = []
+        self.per_step_logits = []
 
         with torch.no_grad():
             # Recurrence starts from the learned cls_token
             print("1. cls_token.shape = ", self.model.cls_token.shape)
             cls_token = self.model.cls_token.expand(input_tensor.shape[0], -1, -1)
             print("2. cls_token.shape = ", cls_token.shape)
+            print(cls_token)
 
             if self.use_different_inputs and input_tensor.size() != self.repeats:
                     print("Number of input tensors ({}) does not match number of recurrence steps ({})".format(input_tensor.size(), self.repeats))
@@ -192,7 +195,11 @@ class RecVITAttentionRollout:
 
                 # model(x, cls_tok) -> (logits, new_cls_tok)
                 step_input = input_tensor[step] if self.use_different_inputs else input_tensor
-                _, cls_token = self.model(step_input, cls_token)
+                output_logits, cls_token = self.model(step_input, cls_token)
+
+                # Store logits for this recurrent step
+                self.per_step_logits.append(output_logits)
+
                 # Store attentions for this recurrent step
                 self.attentions.append(self.current_step_attentions)
 
@@ -205,4 +212,4 @@ class RecVITAttentionRollout:
                 self.step_rollout_matrices.append(step_rollout_matrix)
                 self.step_rollout_masks.append(rollout_matrix_to_mask(step_rollout_matrix))
 
-        return self.rec_rollout(), self.step_rollout_masks
+        return self.rec_rollout(), self.step_rollout_masks, self.per_step_logits
