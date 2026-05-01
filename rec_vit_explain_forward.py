@@ -8,7 +8,7 @@ from PIL import Image
 from torchvision import transforms
 import cv2
 
-from rec_vit_rollout import RecVITAttentionRollout
+from rec_vit_rollout_forward import RecVITAttentionRollout
 from rec_vit_model.pckgs.networks.network_utils import load_trained_network
 
 
@@ -20,7 +20,7 @@ def get_args():
                         help='Use NVIDIA GPU acceleration')
     parser.add_argument('--image_path', type=str, default='./examples/both.png',
                         help='Input image path')
-    parser.add_argument('--output_dir', type=str, default='./rollout_results/',
+    parser.add_argument('--output_dir', type=str, default='./rollout_results_forward/',
                         help='Input image path')
     parser.add_argument('--head_fusion', type=str, default='max',
                         help='How to fuse the attention heads for attention rollout. '
@@ -144,7 +144,7 @@ if __name__ == '__main__':
         use_different_inputs=args.use_different_inputs,
     )
 
-    final_rollout_mask, step_rollout_matrices, per_step_logits = attention_rollout(input_tensor)
+    final_rollout_mask, last_layer_to_first_input_per_step_masks, per_step_logits = attention_rollout(input_tensor)
 
     print(get_predictions(per_step_logits))
 
@@ -167,10 +167,10 @@ if __name__ == '__main__':
     cv2.imwrite(path, mask)
     cv2.waitKey(-1)
 
-    for step, matrix in enumerate(step_rollout_matrices):
-        name = "rec_rollout_{}_loops_step_{}_{}_{:.3f}_{}.png".format(
-            args.n_loops,
+    for step, matrix in enumerate(last_layer_to_first_input_per_step_masks):
+        name = "rec_rollout_input_to_last_step_{}_{}_loops__{}_{:.3f}_{}.png".format(
             step,
+            args.n_loops,
             args.patch_attendance,
             args.discard_ratio,
             args.head_fusion
@@ -182,6 +182,5 @@ if __name__ == '__main__':
         mask = show_mask_on_image(np_img, mask)
         # cv2.imshow("Input Image", np_img)
         # cv2.imshow(path, mask)
-        cv2.imwrite(args.image_path, np_img)
         cv2.imwrite(path, mask)
         cv2.waitKey(-1)

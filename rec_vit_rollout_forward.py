@@ -55,13 +55,13 @@ def build_step_transition(prev_step_rollout_matrix, patch_attendance="identity")
     - patch_attendance == "zero":
         use when patches at each step are treated as new roots
     """
+    n_tokens = prev_step_rollout_matrix.size(-1)
     if patch_attendance == "identity":
         # Same-patch assumption: patch i at step t corresponds to patch i at step t-1
-        n_tokens = prev_step_rollout_matrix.size(-1)
         transition = torch.eye(n_tokens)
     elif patch_attendance == "zero":
         # Different-patch-root assumption: no direct patch-to-patch connection across steps
-        transition = torch.zeros_like(prev_step_rollout_matrix)
+        transition = torch.zeros(n_tokens, n_tokens)
     else:
         raise ValueError(
             f"patch_attendance='{patch_attendance}' not supported. "
@@ -104,8 +104,8 @@ class RecVITAttentionRollout:
         self.step_rollout_masks = []
 
         # Overall rollout from each step output back to step-1 input tokens
-        # self.overall_rollout_matrices = []
-        self.overall_rollout_masks = []
+        self.last_layer_to_first_input_per_step_matrices = []
+        self.last_layer_to_first_input_per_step_masks = []
 
         # Temporary step buffer used by hooks
         self.current_step_attentions = []
@@ -151,15 +151,15 @@ class RecVITAttentionRollout:
                                                               step_input_to_first_input)
             # G_t: last_layer(step t) -> input(step 1)
             # G_t = R_t * B_t
-            overall_rollout_matrix_curr_step = torch.matmul(
+            last_layer_to_first_input_curr_step = torch.matmul(
                 self.step_rollout_matrices[step],
                 step_input_to_first_input
             )
 
-            # self.overall_rollout_matrices.append(overall_rollout_matrix_curr_step)
-            self.overall_rollout_masks.append(rollout_matrix_to_mask(overall_rollout_matrix_curr_step))
+            self.last_layer_to_first_input_per_step_matrices.append(last_layer_to_first_input_curr_step)
+            self.last_layer_to_first_input_per_step_masks.append(rollout_matrix_to_mask(last_layer_to_first_input_curr_step))
 
-        return self.overall_rollout_masks[-1]
+        return self.last_layer_to_first_input_per_step_masks[-1]
 
     def __call__(self, input_tensor):
         """
@@ -176,7 +176,7 @@ class RecVITAttentionRollout:
         self.step_rollout_matrices = []
         self.step_rollout_masks = []
         # self.overall_rollout_matrices = []
-        self.overall_rollout_masks = []
+        self.last_layer_to_first_input_per_step_masks = []
         self.per_step_logits = []
 
         with torch.no_grad():
@@ -212,4 +212,4 @@ class RecVITAttentionRollout:
                 self.step_rollout_matrices.append(step_rollout_matrix)
                 self.step_rollout_masks.append(rollout_matrix_to_mask(step_rollout_matrix))
 
-        return self.rec_rollout(), self.step_rollout_masks, self.per_step_logits
+        return self.rec_rollout(), self.last_layer_to_first_input_per_step_masks, self.per_step_logits
