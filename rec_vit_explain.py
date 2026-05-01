@@ -144,7 +144,7 @@ if __name__ == '__main__':
         use_different_inputs=args.use_different_inputs,
     )
 
-    final_rollout_mask, step_rollout_matrices, per_step_logits = attention_rollout(input_tensor)
+    final_rollout_mask, final_to_step_input_masks, per_step_logits = attention_rollout(input_tensor)
 
     print(get_predictions(per_step_logits))
 
@@ -163,25 +163,25 @@ if __name__ == '__main__':
     mask = show_mask_on_image(np_img, mask)
     # cv2.imshow("Input Image", np_img)
     # cv2.imshow(path, mask)
-    cv2.imwrite(args.image_path, np_img)
+    cv2.imwrite(os.path.join(args.output_dir, "input.png"), np_img)
     cv2.imwrite(path, mask)
     cv2.waitKey(-1)
 
-    for step, matrix in enumerate(step_rollout_matrices):
-        name = "rec_rollout_{}_loops_step_{}_{}_{:.3f}_{}.png".format(
+    for step, step_mask in enumerate(final_to_step_input_masks):
+        name = "rec_rollout_final_to_input_step_{}_{}_loops_{}_{:.3f}_{}.png".format(
+            step + 1,
             args.n_loops,
-            step,
             args.patch_attendance,
             args.discard_ratio,
             args.head_fusion
         ).replace(" ", "")
 
-        path = args.output_dir + name
+        path = os.path.join(args.output_dir, name)
         np_img = np.array(img)[:, :, ::-1]
-        mask = cv2.resize(matrix, (np_img.shape[1], np_img.shape[0]))
+        mask = cv2.resize(step_mask, (np_img.shape[1], np_img.shape[0]))
         mask = show_mask_on_image(np_img, mask)
         # cv2.imshow("Input Image", np_img)
         # cv2.imshow(path, mask)
-        cv2.imwrite(args.image_path, np_img)
+        cv2.imwrite(os.path.join(args.output_dir, "input.png"), np_img)
         cv2.imwrite(path, mask)
         cv2.waitKey(-1)
