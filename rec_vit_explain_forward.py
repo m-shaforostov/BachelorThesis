@@ -18,7 +18,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--use_cuda', action='store_true', default=False,
                         help='Use NVIDIA GPU acceleration')
-    parser.add_argument('--image_path', type=str, default='./examples/both.png',
+    parser.add_argument('--image_path', type=str, default='./examples_CIFAR10/both.png',
                         help='Input image path')
     parser.add_argument('--output_dir', type=str, default='./rollout_results_forward/',
                         help='Input image path')
